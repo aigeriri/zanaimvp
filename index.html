@@ -1,0 +1,1195 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zan AI MVP</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: app shell — navy top bar with language switch and plan meter, tab strip, one working pane per tool, pricing pane, checkout dialog */
+:root{
+  --bg:#f4f5f8; --surface:#ffffff; --ink:#0f1b3d; --muted:#5a6480; --line:#dde1ea;
+  --navy:#13265c; --navy-ink:#eef1f8; --gold:#c8963a; --gold-soft:#f6ecd8;
+  --ok:#2f7d5b; --ok-soft:#e3f2ea; --warn:#9a6b12; --warn-soft:#fbf0d9; --bad:#a33a2a; --bad-soft:#f8e3df;
+  --display:"Montserrat","Noto Sans",system-ui,sans-serif;
+  --body:"Noto Sans",system-ui,-apple-system,sans-serif;
+  --mono:"Noto Sans Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1122; --surface:#131b31; --ink:#e7ebf5; --muted:#9aa4bd; --line:#26304b;
+  --navy:#0a1330; --navy-ink:#e9edf7; --gold:#e0b25a; --gold-soft:#3a2f18;
+  --ok:#5fc095; --ok-soft:#173527; --warn:#e3b55a; --warn-soft:#3a2f14; --bad:#ef8a78; --bad-soft:#3d1d18; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1122; --surface:#131b31; --ink:#e7ebf5; --muted:#9aa4bd; --line:#26304b;
+  --navy:#0a1330; --navy-ink:#e9edf7; --gold:#e0b25a; --gold-soft:#3a2f18;
+  --ok:#5fc095; --ok-soft:#173527; --warn:#e3b55a; --warn-soft:#3a2f14; --bad:#ef8a78; --bad-soft:#3d1d18; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--navy)}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+
+.top{background:var(--navy);color:var(--navy-ink);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:19px}
+.badge{font-family:var(--mono);font-size:11px;border:1px solid rgba(233,237,247,.3);border-radius:4px;padding:2px 6px;font-weight:400}
+.right{display:flex;align-items:center;gap:14px}
+.lang{display:flex;border:1px solid rgba(233,237,247,.3);border-radius:6px;overflow:hidden}
+.lang button{background:none;border:0;color:var(--navy-ink);font-size:12px;font-weight:600;padding:4px 8px;cursor:pointer;opacity:.7}
+.lang button[aria-pressed="true"]{background:var(--gold);color:#16120a;opacity:1}
+.plan{display:flex;align-items:center;gap:10px;font-size:13px;background:none;border:0;color:inherit;cursor:pointer;padding:0}
+.plan .pname{font-weight:700;color:var(--gold)}
+.meter{width:80px;height:6px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--gold)}
+@media (max-width:620px){.plan .lbl,.meter{display:none}.brand .badge{display:none}}
+
+.tabs{display:flex;gap:4px;padding-block:14px 0;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{background:none;border:0;padding:10px 14px;border-bottom:2px solid transparent;cursor:pointer;color:var(--muted);font-weight:600;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--gold)}
+.pane{padding-block:20px 40px}
+.note{font-size:13px;color:var(--muted)}
+.mode{display:flex;gap:8px;align-items:flex-start;background:var(--gold-soft);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:7px;padding:10px 16px;font-weight:600;cursor:pointer;text-decoration:none}
+.btn-primary{background:var(--navy);color:#fff}
+:root[data-theme="dark"] .btn-primary{background:var(--gold);color:#16120a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn-primary{background:var(--gold);color:#16120a}}
+.btn-gold{background:var(--gold);color:#16120a}
+.btn-ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.link{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:13px;padding:0}
+
+/* chat */
+.chat{display:flex;flex-direction:column;gap:14px;min-height:300px}
+.msg{max-width:88%;padding:12px 14px;border-radius:12px;min-width:0;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:var(--navy);color:#fff;border-bottom-right-radius:3px}
+.msg.ai{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:3px}
+.msg.ai p{margin:0 0 8px}.msg.ai p:last-child{margin:0}
+.msg.ai ul,.msg.ai ol{margin:4px 0 8px;padding-left:20px}
+.msg .who{font-size:12px;font-weight:600;color:var(--gold);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.thinking{display:inline-flex;gap:4px}.thinking i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:b 1s infinite}
+.thinking i:nth-child(2){animation-delay:.15s}.thinking i:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,100%{opacity:.3}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.thinking i{animation:none}}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13px;cursor:pointer;text-align:left}
+.chip:hover{border-color:var(--gold)}
+.composer{display:flex;gap:8px;margin-top:16px;position:sticky;bottom:0;background:var(--bg);padding-block:10px calc(10px + env(safe-area-inset-bottom,0px))}
+.composer textarea{flex:1;min-width:0;resize:none;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 12px;height:46px}
+.limit{border:1px solid var(--gold);background:var(--gold-soft);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.limit p{margin:0}
+
+/* forms */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid2>*{min-width:0}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
+input,select,textarea.field{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:9px 11px;width:100%}
+textarea.field{min-height:220px;resize:vertical;font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.result-empty{color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:6px;justify-content:center;align-items:center;min-height:200px;text-align:center}
+
+/* risks */
+.score{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:8px;flex-wrap:wrap}
+.score b{font-family:var(--display);font-size:18px}
+.lvl-high{background:var(--bad-soft);color:var(--bad)}
+.lvl-medium{background:var(--warn-soft);color:var(--warn)}
+.lvl-low{background:var(--ok-soft);color:var(--ok)}
+.risk{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.risk .head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.risk .head b{font-size:14px}
+.pill{font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+.risk p{margin:0;font-size:14px}
+.risk .law{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.risk .fix{font-size:13px;background:var(--bg);border-radius:6px;padding:8px 10px}
+
+.doc{white-space:pre-wrap;font-size:14px;background:var(--bg);border-radius:8px;padding:14px;max-height:520px;overflow:auto;overflow-wrap:anywhere}
+.err{color:var(--bad);font-size:13px}
+
+/* pricing */
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.ph p{margin:6px 0 0;color:var(--muted)}
+.period{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.period button{border:0;background:none;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted)}
+.period button[aria-pressed="true"]{background:var(--navy);color:#fff}
+.plans{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media (max-width:960px){.plans{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.plans{grid-template-columns:1fr}}
+.pcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;position:relative;min-width:0}
+.pcard.hot{border:2px solid var(--gold)}
+.pcard.cur{box-shadow:0 0 0 2px var(--ok) inset}
+.tag{position:absolute;top:-11px;left:16px;background:var(--gold);color:#16120a;font-size:11px;font-weight:700;border-radius:999px;padding:2px 10px;text-transform:uppercase;letter-spacing:.04em}
+.pcard h3{font-size:18px}
+.pcard .who{font-size:13px;color:var(--muted);margin-top:-6px}
+.price{font-family:var(--display);font-size:24px;font-weight:700}
+.price small{font-family:var(--body);font-size:13px;font-weight:500;color:var(--muted)}
+.pcard ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;font-size:13.5px;flex:1}
+.pcard li{display:flex;gap:8px}.pcard li::before{content:"✓";color:var(--ok);font-weight:700}
+.curlbl{font-size:13px;font-weight:700;color:var(--ok);text-align:center;padding:10px 0}
+.pay-strip{margin-top:20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;color:var(--muted)}
+.pay-strip span.m{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 10px;color:var(--ink);font-weight:600}
+.faq{margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:720px){.faq{grid-template-columns:1fr}}
+.faq div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:14px}
+.faq b{display:block;margin-bottom:4px}
+
+/* checkout */
+dialog{border:0;border-radius:14px;padding:0;width:min(460px,calc(100vw - 32px));background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(8,14,32,.55)}
+.dlg{padding:22px;display:flex;flex-direction:column;gap:14px}
+.x{position:absolute;top:10px;right:12px;background:none;border:0;font-size:22px;cursor:pointer;color:var(--muted)}
+.sum{background:var(--bg);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.sum div{display:flex;justify-content:space-between;gap:10px}
+.sum .tot{font-weight:700;border-top:1px solid var(--line);padding-top:6px;margin-top:4px}
+.methods{display:flex;flex-direction:column;gap:8px}
+.method{display:flex;flex-direction:row;align-items:center;gap:12px;border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:pointer;color:var(--ink);font-weight:600;font-size:14px}
+.method input{width:auto;margin:0;accent-color:var(--gold)}
+.method small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.method:has(input:checked){border-color:var(--gold);background:var(--gold-soft)}
+.mico{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-size:12px;font-weight:800;flex:none;color:#fff}
+.demo-pay{font-size:12px;color:var(--muted);background:var(--bg);border-radius:6px;padding:8px 10px}
+.center{text-align:center;align-items:center}
+.okc{width:64px;height:64px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center;font-size:32px;font-weight:700}
+.spin{width:44px;height:44px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--gold);animation:sp 0.9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ok);color:#fff;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;z-index:20;max-width:calc(100vw - 32px)}
+/* auth */
+.auth{position:fixed;inset:0;z-index:30;background:var(--bg);overflow:auto;display:grid;grid-template-columns:1fr 1fr}
+@media (max-width:820px){.auth{grid-template-columns:1fr}}
+.auth-side{background:var(--navy);color:var(--navy-ink);padding:max(40px,env(safe-area-inset-top,0px)) 48px 40px;display:flex;flex-direction:column;gap:28px;justify-content:center}
+@media (max-width:820px){.auth-side{padding:max(24px,env(safe-area-inset-top,0px)) 20px 24px;gap:16px}.auth-side .bens{display:none}}
+.auth-side .brand{font-size:24px}
+.auth-side h1{font-size:clamp(26px,3.4vw,38px);line-height:1.2}
+.auth-side h1 em{font-style:normal;color:var(--gold)}
+.auth-side p{margin:0;color:#c9d3ea}
+.bens{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.bens li{display:flex;gap:12px;align-items:center}
+.bens li span{width:30px;height:30px;border-radius:8px;background:rgba(200,150,58,.18);color:var(--gold);display:grid;place-items:center;font-weight:700;flex:none}
+.auth-main{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 16px calc(32px + env(safe-area-inset-bottom,0px));gap:16px}
+.auth-main .lang{border-color:var(--line)}
+.auth-main .lang button{color:var(--ink)}
+.auth-card{width:min(420px,100%);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:14px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--bg);border-radius:9px;padding:4px}
+.seg button{border:0;background:none;border-radius:7px;padding:9px;font-weight:600;cursor:pointer;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.roles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.roles label{flex-direction:row;justify-content:center;text-align:center;border:1px solid var(--line);border-radius:8px;padding:8px 4px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.roles input{position:absolute;opacity:0;pointer-events:none}
+.roles label:has(input:checked){border-color:var(--gold);background:var(--gold-soft)}
+.agree{flex-direction:row;align-items:flex-start;gap:8px;font-weight:400;font-size:12.5px}
+.agree input{width:auto;margin-top:3px;accent-color:var(--gold)}
+.pw{position:relative}.pw input{padding-right:44px}
+.pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:var(--muted);font-size:12px;padding:4px}
+.switch{font-size:13px;color:var(--muted);text-align:center}
+.switch button{background:none;border:0;color:var(--gold);font-weight:700;cursor:pointer;padding:0}
+.user{display:flex;align-items:center;gap:8px;font-size:13px}
+.ava{width:28px;height:28px;border-radius:50%;background:var(--gold);color:#16120a;display:grid;place-items:center;font-weight:700;font-size:13px}
+.out{background:none;border:1px solid rgba(233,237,247,.3);border-radius:6px;color:var(--navy-ink);font-size:12px;padding:4px 8px;cursor:pointer}
+@media (max-width:620px){.user .uname{display:none}}
+footer{padding-block:24px 40px;font-size:12px;color:var(--muted);border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="auth" id="auth" hidden>
+  <aside class="auth-side">
+    <div class="brand"><svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4v22M9 27h14M6 9h20"/><path d="M6 9l-4 9a4 4 0 0 0 8 0zM26 9l-4 9a4 4 0 0 0 8 0z"/></svg>Zan AI</div>
+    <h1 data-i="a_h"></h1>
+    <p data-i="a_sub"></p>
+    <ul class="bens"><li><span>§</span><b data-i="b1"></b></li><li><span>✓</span><b data-i="b2"></b></li><li><span>✎</span><b data-i="b3"></b></li></ul>
+  </aside>
+  <div class="auth-main">
+    <div class="lang" role="group" aria-label="Language"><button data-lang="kk">ҚАЗ</button><button data-lang="ru">РУС</button><button data-lang="en">ENG</button></div>
+    <div class="auth-card">
+      <div class="seg" role="tablist"><button type="button" data-am="reg" data-i="a_reg"></button><button type="button" data-am="login" data-i="a_login"></button></div>
+      <form id="regForm" novalidate style="display:flex;flex-direction:column;gap:12px">
+        <label><span data-i="f_name"></span><input id="rName" autocomplete="name"></label>
+        <label><span data-i="f_email"></span><input id="rEmail" type="email" autocomplete="email" placeholder="you@mail.kz"></label>
+        <label><span data-i="f_pass"></span><span class="pw"><input id="rPass" type="password" autocomplete="new-password"><button type="button" data-eye data-i="show"></button></span></label>
+        <label><span data-i="f_pass2"></span><input id="rPass2" type="password" autocomplete="new-password"></label>
+        <div><div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:5px" data-i="f_role"></div>
+          <div class="roles"><label><input type="radio" name="role" value="biz" checked><span data-i="r_biz"></span></label><label><input type="radio" name="role" value="lawyer"><span data-i="r_lawyer"></span></label><label><input type="radio" name="role" value="citizen"><span data-i="r_citizen"></span></label></div></div>
+        <label class="agree"><input type="checkbox" id="rAgree"><span data-i="f_agree"></span></label>
+        <div class="err" id="regErr" role="alert"></div>
+        <button class="btn btn-gold" type="submit" data-i="a_reg_btn"></button>
+        <p class="note" style="margin:0;text-align:center" data-i="a_free"></p>
+        <div class="switch"><span data-i="a_have"></span> <button type="button" data-am="login" data-i="a_login"></button></div>
+      </form>
+      <form id="loginForm" novalidate hidden style="display:flex;flex-direction:column;gap:12px">
+        <label><span data-i="f_email"></span><input id="lEmail" type="email" autocomplete="email" placeholder="you@mail.kz"></label>
+        <label><span data-i="f_pass"></span><span class="pw"><input id="lPass" type="password" autocomplete="current-password"><button type="button" data-eye data-i="show"></button></span></label>
+        <div class="err" id="loginErr" role="alert"></div>
+        <button class="btn btn-gold" type="submit" data-i="a_login_btn"></button>
+        <div class="switch"><span data-i="a_no"></span> <button type="button" data-am="reg" data-i="a_to_reg"></button></div>
+      </form>
+    </div>
+    <p class="note" style="margin:0;max-width:420px;text-align:center" data-i="a_note"></p>
+  </div>
+</div>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4v22M9 27h14M6 9h20"/><path d="M6 9l-4 9a4 4 0 0 0 8 0zM26 9l-4 9a4 4 0 0 0 8 0z"/></svg>
+      Zan AI <span class="badge">MVP</span>
+    </div>
+    <div class="right">
+      <div class="lang" role="group" aria-label="Language">
+        <button data-lang="kk">ҚАЗ</button><button data-lang="ru">РУС</button><button data-lang="en">ENG</button>
+      </div>
+      <button class="plan" id="planBtn" type="button">
+        <span class="pname" id="planName">Free</span><span class="lbl" id="quotaTxt"></span>
+        <span class="meter" id="meter"><i id="quotaBar" style="width:100%"></i></span>
+      </button>
+      <div class="user"><span class="ava" id="ava">?</span><span class="uname" id="uname"></span><button class="out" id="logout" type="button" data-i="logout"></button></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-tab="ask" data-i="tab_ask"></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="check" data-i="tab_check"></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="docs" data-i="tab_docs"></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="plans" data-i="tab_plans"></button>
+  </nav>
+
+  <div id="modeNote" class="mode" hidden></div>
+
+  <!-- ASK -->
+  <section class="pane" id="pane-ask">
+    <div class="chat" id="chat">
+      <div class="msg ai"><div class="who">Zan AI</div><p data-i="hello"></p></div>
+      <div class="chips" id="examples"></div>
+    </div>
+    <form class="composer" id="askForm">
+      <textarea id="q" data-ph="q_ph" rows="1"></textarea>
+      <button class="btn btn-primary" id="askBtn" type="submit" data-i="ask_btn"></button>
+      <button class="btn btn-ghost" id="stopBtn" type="button" hidden data-i="stop"></button>
+    </form>
+  </section>
+
+  <!-- CHECK -->
+  <section class="pane" id="pane-check" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h3 data-i="c_title"></h3>
+        <textarea class="field" id="contract" data-ph="c_ph"></textarea>
+        <div class="row">
+          <label class="btn btn-ghost" style="flex-direction:row;font-size:14px;color:var(--ink)"><span data-i="c_upload"></span><input id="file" type="file" accept=".txt,text/plain" hidden></label>
+          <button class="btn btn-ghost" id="sampleContract" type="button" data-i="c_sample"></button>
+          <button class="btn btn-primary" id="checkBtn" type="button" data-i="c_btn"></button>
+        </div>
+        <div class="err" id="checkErr"></div>
+      </div>
+      <div class="card" id="checkOut"></div>
+    </div>
+  </section>
+
+  <!-- DOCS -->
+  <section class="pane" id="pane-docs" hidden>
+    <div class="grid2">
+      <form class="card" id="docForm">
+        <h3 data-i="d_title"></h3>
+        <label for="dtype"><span data-i="d_type"></span><select id="dtype"></select></label>
+        <label for="p1"><span data-i="d_p1"></span><input id="p1" value="ИП «Кофейня Арман», ИИН 900101300123"></label>
+        <label for="p2"><span data-i="d_p2"></span><input id="p2" value="ТОО «Алмалы Недвижимость», БИН 150340012345"></label>
+        <div class="grid2" style="gap:12px">
+          <label for="city"><span data-i="d_city"></span><input id="city" value="Алматы"></label>
+          <label for="sum"><span data-i="d_sum"></span><input id="sum" value="450 000"></label>
+        </div>
+        <label for="details"><span data-i="d_det"></span><textarea class="field" id="details" style="min-height:90px">Помещение 60 м² по ул. Абая 52, срок 11 месяцев, депозит за один месяц.</textarea></label>
+        <div class="row">
+          <button class="btn btn-primary" id="docBtn" type="submit" data-i="d_btn"></button>
+          <button class="btn btn-ghost" id="copyBtn" type="button" hidden data-i="copy"></button>
+        </div>
+        <div class="err" id="docErr"></div>
+      </form>
+      <div class="card">
+        <h3 data-i="d_res"></h3>
+        <div id="docOut" class="result-empty"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLANS -->
+  <section class="pane" id="pane-plans" hidden>
+    <div class="ph">
+      <div><h2 data-i="p_title"></h2><p data-i="p_sub"></p></div>
+      <div class="period" role="group">
+        <button data-period="month" aria-pressed="true" data-i="p_month"></button>
+        <button data-period="year" aria-pressed="false" data-i="p_year"></button>
+      </div>
+    </div>
+    <div class="plans" id="plans"></div>
+    <div class="pay-strip"><span data-i="p_methods"></span><span class="m">Kaspi.kz</span><span class="m">Visa</span><span class="m">Mastercard</span><span class="m">Halyk Homebank</span><span class="m">Apple Pay</span><span class="m">Google Pay</span></div>
+    <div class="faq" id="faq"></div>
+    <p class="note" style="margin-top:16px"><button class="link" id="resetPlan" type="button" hidden data-i="p_reset"></button></p>
+  </section>
+
+  <footer data-i="footer"></footer>
+</main>
+
+<dialog id="checkout"><div style="position:relative"><button class="x" type="button" id="dlgX" aria-label="Close">×</button><div class="dlg" id="dlgBody"></div></div></dialog>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const store = { get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+                set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
+function md(s){
+  const lines = esc(s).split(/\n/); let out = "", list = null;
+  const inline = t => t.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/(^|[^*])\*(?!\s)(.+?)\*/g,"$1<i>$2</i>").replace(/`(.+?)`/g,"<code>$1</code>");
+  const close = () => { if(list){ out += `</${list}>`; list = null; } };
+  for (const raw of lines){
+    const l = raw.trim(); let m;
+    if (!l){ close(); continue; }
+    if ((m = l.match(/^[-•*]\s+(.*)/))){ if(list!=="ul"){ close(); out+="<ul>"; list="ul"; } out+=`<li>${inline(m[1])}</li>`; continue; }
+    if ((m = l.match(/^\d+[.)]\s+(.*)/))){ if(list!=="ol"){ close(); out+="<ol>"; list="ol"; } out+=`<li>${inline(m[1])}</li>`; continue; }
+    close();
+    const h = l.replace(/^#{1,4}\s+/,"");
+    out += h!==l ? `<p><b>${inline(h)}</b></p>` : `<p>${inline(l)}</p>`;
+  }
+  close(); return out;
+}
+
+/* ================= TEXTS (kk / ru / en) ================= */
+const T = {
+ru:{
+  tab_ask:"Вопрос по закону", tab_check:"Проверка договора", tab_docs:"Документы", tab_plans:"Тарифы",
+  hello:"Здравствуйте! Я помогаю разобраться в законодательстве Казахстана. Задайте вопрос простыми словами, и я отвечу со ссылками на нормы. Можно писать на казахском, русском или английском.",
+  q_ph:"Например: как оформить самозанятость?", ask_btn:"Спросить", stop:"Стоп",
+  c_title:"Текст договора", c_ph:"Вставьте текст договора или загрузите .txt файл", c_upload:"Загрузить .txt", c_sample:"Пример договора", c_btn:"Проверить риски",
+  c_empty_t:"Здесь появится разбор", c_empty:"Zan AI найдёт рискованные условия, оценит уровень опасности и предложит правки со ссылками на законы РК.",
+  c_short:"Вставьте текст договора — хотя бы несколько пунктов.", c_reading:"Zan AI читает договор…",
+  c_demo:"Без AI проверяется только пример договора. Свой договор проверяется, когда AI подключён.",
+  risk:"Риск", items:"пунктов к проверке", fix:"Правка:", lvl:{high:"Высокий",medium:"Средний",low:"Низкий"},
+  d_title:"Черновик документа", d_type:"Тип документа", d_p1:"Сторона 1 (вы)", d_p2:"Сторона 2", d_city:"Город", d_sum:"Сумма, ₸", d_det:"Детали",
+  d_btn:"Сгенерировать", copy:"Копировать", copied:"Скопировано", selected:"Выделено — нажмите Ctrl+C", d_res:"Результат",
+  d_empty_t:"Черновик появится здесь", d_empty:"Заполните поля слева и нажмите «Сгенерировать».", d_parties:"Укажите обе стороны.",
+  dtypes:{lease:"Договор аренды нежилого помещения", services:"Договор оказания услуг", claim:"Претензия (досудебная)", labor:"Трудовой договор", refund:"Заявление о возврате денег"},
+  footer:"Zan AI — учебный MVP. Ответы носят справочный характер и не заменяют консультацию юриста. Сверяйте нормы с актуальной редакцией на adilet.zan.kz.",
+  demo_b:"Демо-режим.", demo_r:"AI ещё не подключён к сайту.", demo_t:"Примеры вопросов, проверка примера договора и шаблоны документов работают и без AI.",
+  demo_ans:"В демо-режиме я отвечаю только на примеры вопросов. Когда AI подключён, можно задавать любые вопросы — Zan AI ответит со ссылками на законы РК.",
+  quota:"сегодня {l} из {n}", unlimited:"безлимит",
+  limit_t:"Дневной лимит тарифа **Free** — 10 запросов в день — исчерпан. Лимит обновится завтра, а на тарифах **«Бизнес»** и **Pro** запросы без ограничений.",
+  limit_btn:"Посмотреть тарифы",
+  p_title:"Тарифы и подписка", p_sub:"Начните бесплатно и переходите на платный тариф, когда понадобится. Отменить можно в любой момент.",
+  p_month:"Помесячно", p_year:"За год −20%", per_m:"/мес", per_y:"/год", popular:"Популярный",
+  p_cur:"Ваш тариф", p_choose:"Перейти на {p}", p_contact:"Оставить заявку", p_methods:"Способы оплаты:",
+  p_reset:"Вернуться на Free (для теста демо)", by_deal:"по договору", free_price:"0 ₸",
+  plans:{
+    free:{who:"Для знакомства", f:["10 запросов в день","Ответы со ссылками на законы РК","Казахский, русский и английский","Без привязки карты"]},
+    biz:{who:"Для ИП и малого бизнеса", f:["Безлимитные вопросы","Проверка договоров: риски и уровень опасности","Черновики документов: аренда, услуги, претензии","История вопросов и документов","Приоритетная скорость ответов"]},
+    pro:{who:"Для юристов", f:["Всё из тарифа «Бизнес»","До 100 углублённых проверок договоров в месяц","Сложные шаблоны: уставы, корпоративные договоры, иски","История дел по клиентам","Уведомления об изменениях в законах","Экспорт в Word и PDF","Приоритетная поддержка"]},
+    b2b:{who:"Для компаний", f:["Доступ для всей команды","API: Zan AI в вашем сайте или CRM","Индивидуальные лимиты и цена","Персональный менеджер и SLA"]}
+  },
+  faq:[["Что будет, когда закончатся 10 запросов?","На Free лимит обновляется каждый день. Чтобы не ждать, перейдите на «Бизнес» или Pro — там запросы без ограничений."],
+       ["Как отменить подписку?","В любой момент в настройках тарифа. Доступ сохранится до конца оплаченного периода."],
+       ["Какие способы оплаты есть?","Kaspi.kz (Kaspi QR / Kaspi Pay), карты Visa и Mastercard любого банка, Halyk Homebank, Apple Pay и Google Pay."],
+       ["Есть ли тариф для компании?","Да, B2B: доступ для команды, API и индивидуальная цена. Оставьте заявку — мы свяжемся с вами."]],
+  co_title:"Оформление подписки", co_plan:"Тариф", co_period:"Период", co_month:"1 месяц", co_year:"12 месяцев", co_disc:"Скидка 20%", co_total:"К оплате",
+  co_method:"Способ оплаты", co_pay:"Оплатить {s}", co_cancel:"Отмена",
+  co_demo:"Демо-оплата для MVP: деньги не списываются, данные карты не запрашиваются.",
+  m:{kaspi:["Kaspi.kz","Kaspi QR или Kaspi Pay в приложении"], card:["Банковская карта","Visa, Mastercard любого банка РК"], halyk:["Halyk Bank","Оплата через Homebank"], wallet:["Apple Pay / Google Pay","Оплата в одно касание"]},
+  co_proc:"Обрабатываем оплату…", co_proc_s:"Подтверждаем платёж через {m}",
+  co_ok:"Оплата прошла успешно!", co_ok_s:"Тариф {p} подключён. Теперь запросы без ограничений и доступны все функции тарифа.",
+  co_next:"Следующее списание", co_paid:"Оплачено", co_via:"Способ", co_start:"Начать пользоваться",
+  toast:"Тариф {p} активен",
+  e_rate:"Слишком много запросов. Подождите немного и попробуйте снова.", e_json:"Не удалось разобрать ответ. Нажмите ещё раз.", e_net:"Связь прервалась. Попробуйте ещё раз.", e_stop:"Остановлено.",
+  lang_name:"русский",
+  a_h:"Законы Казахстана — <em>понятным языком</em>",
+  a_sub:"Юридический AI-ассистент для предпринимателей, юристов и граждан.",
+  b1:"Ответы со ссылками на законы РК",
+  b2:"Проверка договоров на риски",
+  b3:"Черновики документов за минуты",
+  a_reg:"Регистрация",
+  a_login:"Вход",
+  f_name:"Имя",
+  f_email:"Email",
+  f_pass:"Пароль",
+  f_pass2:"Повторите пароль",
+  f_role:"Кто вы?",
+  r_biz:"Предприниматель",
+  r_lawyer:"Юрист",
+  r_citizen:"Гражданин / студент",
+  f_agree:"Я согласен(на) с условиями использования и обработкой персональных данных",
+  a_reg_btn:"Создать аккаунт",
+  a_login_btn:"Войти",
+  a_have:"Уже есть аккаунт?",
+  a_no:"Нет аккаунта?",
+  a_to_reg:"Зарегистрироваться",
+  a_free:"После регистрации — тариф Free: 10 запросов в день",
+  a_note:"Демо-версия MVP: аккаунт сохраняется только в этом браузере.",
+  show:"Показать",
+  hide:"Скрыть",
+  logout:"Выйти",
+  welcome:"Добро пожаловать, {n}!",
+  hi:"С возвращением, {n}!",
+  e_name:"Введите имя.",
+  e_email:"Введите корректный email.",
+  e_pass:"Пароль — минимум 6 символов.",
+  e_pass2:"Пароли не совпадают.",
+  e_agree:"Нужно согласие с условиями.",
+  e_exists:"Аккаунт с таким email уже есть — войдите.",
+  e_nouser:"Аккаунт не найден — зарегистрируйтесь.",
+  e_wrong:"Неверный пароль.",
+  e_empty:"Введите email и пароль."
+},
+kk:{
+  tab_ask:"Заң бойынша сұрақ", tab_check:"Шартты тексеру", tab_docs:"Құжаттар", tab_plans:"Тарифтер",
+  hello:"Сәлеметсіз бе! Мен Қазақстан заңнамасын түсінуге көмектесемін. Сұрағыңызды қарапайым сөзбен жазыңыз, мен заң нормаларына сілтеме жасап жауап беремін. Қазақша, орысша немесе ағылшынша жаза аласыз.",
+  q_ph:"Мысалы: өзін-өзі жұмыспен қамтуды қалай рәсімдеуге болады?", ask_btn:"Сұрау", stop:"Тоқтату",
+  c_title:"Шарт мәтіні", c_ph:"Шарт мәтінін қойыңыз немесе .txt файлын жүктеңіз", c_upload:".txt жүктеу", c_sample:"Шарт үлгісі", c_btn:"Тәуекелдерді тексеру",
+  c_empty_t:"Талдау осында шығады", c_empty:"Zan AI тәуекелді талаптарды табады, қауіп деңгейін бағалайды және ҚР заңдарына сілтеме жасап түзетулер ұсынады.",
+  c_short:"Шарт мәтінін қойыңыз — кемінде бірнеше тармақ.", c_reading:"Zan AI шартты оқып жатыр…",
+  c_demo:"AI-сыз тек шарт үлгісі тексеріледі. Өз шартыңыз AI қосылғанда тексеріледі.",
+  risk:"Тәуекел", items:"тармақ тексеруге", fix:"Түзету:", lvl:{high:"Жоғары",medium:"Орташа",low:"Төмен"},
+  d_title:"Құжат жобасы", d_type:"Құжат түрі", d_p1:"1-тарап (сіз)", d_p2:"2-тарап", d_city:"Қала", d_sum:"Сома, ₸", d_det:"Толығырақ",
+  d_btn:"Құрастыру", copy:"Көшіру", copied:"Көшірілді", selected:"Белгіленді — Ctrl+C басыңыз", d_res:"Нәтиже",
+  d_empty_t:"Жоба осында шығады", d_empty:"Сол жақтағы өрістерді толтырып, «Құрастыру» батырмасын басыңыз.", d_parties:"Екі тарапты да көрсетіңіз.",
+  dtypes:{lease:"Тұрғын емес үй-жайды жалдау шарты", services:"Қызмет көрсету шарты", claim:"Сотқа дейінгі талап (претензия)", labor:"Еңбек шарты", refund:"Ақшаны қайтару туралы өтініш"},
+  footer:"Zan AI — оқу MVP-і. Жауаптар анықтамалық сипатта және заңгер кеңесін алмастырмайды. Нормаларды adilet.zan.kz сайтындағы өзекті редакциямен салыстырыңыз.",
+  demo_b:"Демо-режим.", demo_r:"AI сайтқа әлі қосылмаған.", demo_t:"Сұрақ мысалдары, шарт үлгісін тексеру және құжат үлгілері AI-сыз да жұмыс істейді.",
+  demo_ans:"Демо-режимде мен тек мысал сұрақтарға жауап беремін. AI қосылғанда кез келген сұрақ қоюға болады — Zan AI ҚР заңдарына сілтеме жасап жауап береді.",
+  quota:"бүгін {l}/{n}", unlimited:"шексіз",
+  limit_t:"**Free** тарифінің күндік лимиті — күніне 10 сұрау — таусылды. Лимит ертең жаңарады, ал **«Бизнес»** және **Pro** тарифтерінде сұраулар шексіз.",
+  limit_btn:"Тарифтерді көру",
+  p_title:"Тарифтер және жазылым", p_sub:"Тегін бастаңыз, қажет болғанда ақылы тарифке өтіңіз. Кез келген уақытта бас тартуға болады.",
+  p_month:"Ай сайын", p_year:"Жылына −20%", per_m:"/ай", per_y:"/жыл", popular:"Танымал",
+  p_cur:"Сіздің тарифіңіз", p_choose:"{p} тарифіне өту", p_contact:"Өтінім қалдыру", p_methods:"Төлем әдістері:",
+  p_reset:"Free тарифіне қайту (демо тест үшін)", by_deal:"келісім бойынша", free_price:"0 ₸",
+  plans:{
+    free:{who:"Танысу үшін", f:["Күніне 10 сұрау","ҚР заңдарына сілтемесі бар жауаптар","Қазақ, орыс және ағылшын тілдері","Картаны байлаусыз"]},
+    biz:{who:"ЖК мен шағын бизнес үшін", f:["Шексіз сұрақтар","Шарттарды тексеру: тәуекелдер мен қауіп деңгейі","Құжат жобалары: жалдау, қызмет көрсету, талаптар","Сұрақтар мен құжаттар тарихы","Жауаптардың басым жылдамдығы"]},
+    pro:{who:"Заңгерлер үшін", f:["«Бизнес» тарифіндегі барлығы","Айына 100-ге дейін тереңдетілген шарт тексеру","Күрделі үлгілер: жарғылар, корпоративтік шарттар, талап арыздар","Клиенттер бойынша істер тарихы","Заң өзгерістері туралы хабарламалар","Word және PDF-ке экспорт","Басым қолдау"]},
+    b2b:{who:"Компаниялар үшін", f:["Бүкіл командаға қолжетімділік","API: Zan AI сіздің сайтыңызда немесе CRM-де","Жеке лимиттер мен баға","Жеке менеджер және SLA"]}
+  },
+  faq:[["10 сұрау біткенде не болады?","Free тарифінде лимит күн сайын жаңарады. Күтпеу үшін «Бизнес» немесе Pro тарифіне өтіңіз — онда сұраулар шексіз."],
+       ["Жазылымнан қалай бас тартуға болады?","Кез келген уақытта тариф баптауларында. Қолжетімділік төленген кезеңнің соңына дейін сақталады."],
+       ["Қандай төлем әдістері бар?","Kaspi.kz (Kaspi QR / Kaspi Pay), кез келген банктің Visa және Mastercard карталары, Halyk Homebank, Apple Pay және Google Pay."],
+       ["Компанияға арналған тариф бар ма?","Иә, B2B: командаға қолжетімділік, API және жеке баға. Өтінім қалдырыңыз — біз сізбен байланысамыз."]],
+  co_title:"Жазылымды рәсімдеу", co_plan:"Тариф", co_period:"Кезең", co_month:"1 ай", co_year:"12 ай", co_disc:"20% жеңілдік", co_total:"Төлеуге",
+  co_method:"Төлем әдісі", co_pay:"{s} төлеу", co_cancel:"Бас тарту",
+  co_demo:"MVP үшін демо-төлем: ақша есептен шығарылмайды, карта деректері сұралмайды.",
+  m:{kaspi:["Kaspi.kz","Қосымшадағы Kaspi QR немесе Kaspi Pay"], card:["Банк картасы","ҚР кез келген банкінің Visa, Mastercard картасы"], halyk:["Halyk Bank","Homebank арқылы төлеу"], wallet:["Apple Pay / Google Pay","Бір рет басып төлеу"]},
+  co_proc:"Төлем өңделуде…", co_proc_s:"{m} арқылы төлемді растап жатырмыз",
+  co_ok:"Төлем сәтті өтті!", co_ok_s:"{p} тарифі қосылды. Енді сұраулар шексіз және тарифтің барлық мүмкіндіктері қолжетімді.",
+  co_next:"Келесі төлем", co_paid:"Төленді", co_via:"Әдіс", co_start:"Пайдалануды бастау",
+  toast:"{p} тарифі белсенді",
+  e_rate:"Сұраулар тым көп. Біраз күтіп, қайта көріңіз.", e_json:"Жауапты талдау мүмкін болмады. Қайта басыңыз.", e_net:"Байланыс үзілді. Қайта көріңіз.", e_stop:"Тоқтатылды.",
+  lang_name:"қазақ тілі",
+  a_h:"Қазақстан заңдары — <em>түсінікті тілмен</em>",
+  a_sub:"Кәсіпкерлерге, заңгерлерге және азаматтарға арналған заңгерлік AI-көмекші.",
+  b1:"ҚР заңдарына сілтемесі бар жауаптар",
+  b2:"Шарттарды тәуекелге тексеру",
+  b3:"Құжат жобалары бірнеше минутта",
+  a_reg:"Тіркелу",
+  a_login:"Кіру",
+  f_name:"Аты",
+  f_email:"Email",
+  f_pass:"Құпиясөз",
+  f_pass2:"Құпиясөзді қайталаңыз",
+  f_role:"Сіз кімсіз?",
+  r_biz:"Кәсіпкер",
+  r_lawyer:"Заңгер",
+  r_citizen:"Азамат / студент",
+  f_agree:"Пайдалану шарттарымен және дербес деректерді өңдеумен келісемін",
+  a_reg_btn:"Аккаунт құру",
+  a_login_btn:"Кіру",
+  a_have:"Аккаунтыңыз бар ма?",
+  a_no:"Аккаунтыңыз жоқ па?",
+  a_to_reg:"Тіркелу",
+  a_free:"Тіркелгеннен кейін — Free тарифі: күніне 10 сұрау",
+  a_note:"MVP демо-нұсқасы: аккаунт тек осы браузерде сақталады.",
+  show:"Көрсету",
+  hide:"Жасыру",
+  logout:"Шығу",
+  welcome:"Қош келдіңіз, {n}!",
+  hi:"Қайта оралуыңызбен, {n}!",
+  e_name:"Атыңызды енгізіңіз.",
+  e_email:"Дұрыс email енгізіңіз.",
+  e_pass:"Құпиясөз — кемінде 6 таңба.",
+  e_pass2:"Құпиясөздер сәйкес келмейді.",
+  e_agree:"Шарттармен келісу қажет.",
+  e_exists:"Бұл email-мен аккаунт бар — кіріңіз.",
+  e_nouser:"Аккаунт табылмады — тіркеліңіз.",
+  e_wrong:"Құпиясөз қате.",
+  e_empty:"Email мен құпиясөзді енгізіңіз."
+},
+en:{
+  tab_ask:"Legal question", tab_check:"Contract check", tab_docs:"Documents", tab_plans:"Pricing",
+  hello:"Hello! I help you make sense of Kazakhstan law. Ask your question in plain words and I'll answer with references to the relevant rules. You can write in Kazakh, Russian or English.",
+  q_ph:"For example: how do I register as self-employed?", ask_btn:"Ask", stop:"Stop",
+  c_title:"Contract text", c_ph:"Paste the contract text or upload a .txt file", c_upload:"Upload .txt", c_sample:"Sample contract", c_btn:"Check risks",
+  c_empty_t:"The analysis will appear here", c_empty:"Zan AI finds risky clauses, rates how dangerous they are and suggests fixes with references to Kazakhstan law.",
+  c_short:"Paste the contract text — at least a few clauses.", c_reading:"Zan AI is reading the contract…",
+  c_demo:"Without AI only the sample contract can be checked. Your own contract is checked once AI is connected.",
+  risk:"Risk", items:"clauses to review", fix:"Fix:", lvl:{high:"High",medium:"Medium",low:"Low"},
+  d_title:"Document draft", d_type:"Document type", d_p1:"Party 1 (you)", d_p2:"Party 2", d_city:"City", d_sum:"Amount, ₸", d_det:"Details",
+  d_btn:"Generate", copy:"Copy", copied:"Copied", selected:"Selected — press Ctrl+C", d_res:"Result",
+  d_empty_t:"Your draft will appear here", d_empty:"Fill in the fields on the left and press “Generate”.", d_parties:"Enter both parties.",
+  dtypes:{lease:"Commercial premises lease agreement", services:"Service agreement", claim:"Pre-trial claim letter", labor:"Employment contract", refund:"Refund request"},
+  footer:"Zan AI is a student MVP. Answers are for reference only and do not replace a lawyer's advice. Check the rules against the current version on adilet.zan.kz.",
+  demo_b:"Demo mode.", demo_r:"AI is not connected to the site yet.", demo_t:"Example questions, the sample contract check and document templates work without AI.",
+  demo_ans:"In demo mode I only answer the example questions. Once AI is connected you can ask anything — Zan AI will answer with references to Kazakhstan law.",
+  quota:"{l} of {n} left today", unlimited:"unlimited",
+  limit_t:"You've used today's **Free** limit of 10 requests. It resets tomorrow, and the **Business** and **Pro** plans have unlimited requests.",
+  limit_btn:"See plans",
+  p_title:"Plans & subscription", p_sub:"Start for free and upgrade when you need more. Cancel anytime.",
+  p_month:"Monthly", p_year:"Yearly −20%", per_m:"/mo", per_y:"/yr", popular:"Popular",
+  p_cur:"Your plan", p_choose:"Switch to {p}", p_contact:"Request a quote", p_methods:"Payment methods:",
+  p_reset:"Back to Free (demo testing)", by_deal:"custom", free_price:"0 ₸",
+  plans:{
+    free:{who:"To try it out", f:["10 requests per day","Answers with references to KZ law","Kazakh, Russian and English","No card required"]},
+    biz:{who:"For sole traders & small business", f:["Unlimited questions","Contract checks: risks and severity","Document drafts: leases, services, claims","Question and document history","Priority response speed"]},
+    pro:{who:"For lawyers", f:["Everything in Business","Up to 100 in-depth contract reviews per month","Advanced templates: charters, corporate agreements, lawsuits","Case history by client","Alerts on changes in the law","Export to Word and PDF","Priority support"]},
+    b2b:{who:"For companies", f:["Access for your whole team","API: Zan AI inside your site or CRM","Custom limits and pricing","Dedicated manager and SLA"]}
+  },
+  faq:[["What happens after 10 requests?","On Free the limit resets every day. To skip the wait, switch to Business or Pro — they have unlimited requests."],
+       ["How do I cancel?","Anytime in your plan settings. You keep access until the end of the paid period."],
+       ["Which payment methods are supported?","Kaspi.kz (Kaspi QR / Kaspi Pay), Visa and Mastercard from any bank, Halyk Homebank, Apple Pay and Google Pay."],
+       ["Is there a plan for companies?","Yes, B2B: team access, API and custom pricing. Leave a request and we'll get in touch."]],
+  co_title:"Checkout", co_plan:"Plan", co_period:"Billing period", co_month:"1 month", co_year:"12 months", co_disc:"20% off", co_total:"Total",
+  co_method:"Payment method", co_pay:"Pay {s}", co_cancel:"Cancel",
+  co_demo:"Demo payment for the MVP: no money is charged and no card details are requested.",
+  m:{kaspi:["Kaspi.kz","Kaspi QR or Kaspi Pay in the app"], card:["Bank card","Visa, Mastercard from any KZ bank"], halyk:["Halyk Bank","Pay with Homebank"], wallet:["Apple Pay / Google Pay","One-tap payment"]},
+  co_proc:"Processing payment…", co_proc_s:"Confirming the payment via {m}",
+  co_ok:"Payment successful!", co_ok_s:"You're now on the {p} plan. Requests are unlimited and all plan features are unlocked.",
+  co_next:"Next payment", co_paid:"Paid", co_via:"Method", co_start:"Start using Zan AI",
+  toast:"{p} plan is active",
+  e_rate:"Too many requests. Please wait a moment and try again.", e_json:"Couldn't read the answer. Please try again.", e_net:"Connection lost. Please try again.", e_stop:"Stopped.",
+  lang_name:"English",
+  a_h:"Kazakhstan law in <em>plain language</em>",
+  a_sub:"A legal AI assistant for entrepreneurs, lawyers and citizens.",
+  b1:"Answers with references to KZ law",
+  b2:"Contract risk checks",
+  b3:"Document drafts in minutes",
+  a_reg:"Sign up",
+  a_login:"Log in",
+  f_name:"Name",
+  f_email:"Email",
+  f_pass:"Password",
+  f_pass2:"Repeat password",
+  f_role:"Who are you?",
+  r_biz:"Entrepreneur",
+  r_lawyer:"Lawyer",
+  r_citizen:"Citizen / student",
+  f_agree:"I agree to the terms of use and the processing of personal data",
+  a_reg_btn:"Create account",
+  a_login_btn:"Log in",
+  a_have:"Already have an account?",
+  a_no:"No account yet?",
+  a_to_reg:"Sign up",
+  a_free:"After signing up you get the Free plan: 10 requests per day",
+  a_note:"MVP demo: your account is stored only in this browser.",
+  show:"Show",
+  hide:"Hide",
+  logout:"Log out",
+  welcome:"Welcome, {n}!",
+  hi:"Welcome back, {n}!",
+  e_name:"Enter your name.",
+  e_email:"Enter a valid email.",
+  e_pass:"Password must be at least 6 characters.",
+  e_pass2:"Passwords don't match.",
+  e_agree:"Please accept the terms.",
+  e_exists:"An account with this email already exists — log in.",
+  e_nouser:"Account not found — sign up.",
+  e_wrong:"Wrong password.",
+  e_empty:"Enter your email and password."
+}};
+
+let lang = store.get("zan-lang", null) || ((navigator.language||"").startsWith("kk") ? "kk" : (navigator.language||"").startsWith("en") ? "en" : "ru");
+if (!T[lang]) lang = "ru";
+const t = (k, v={}) => { let s = k.split(".").reduce((o,p)=>o&&o[p], T[lang]); if (typeof s !== "string") return s; return s.replace(/\{(\w+)\}/g, (_,x)=> v[x] ?? ""); };
+
+/* ================= PLAN + QUOTA ================= */
+const LIMIT = 10;
+const PRICES = { biz:{month:4990, year:47900, name:"Бизнес"}, pro:{month:14990, year:143900, name:"Pro"} };
+const planLabel = p => p==="biz" ? (lang==="en" ? "Business" : "«Бизнес»") : p==="pro" ? "Pro" : "Free";
+const fmt = n => n.toLocaleString("ru-RU").replace(/,/g," ") + " ₸";
+const today = () => { const d = new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); };
+let user = null;
+const K = k => k + ":" + (user ? user.email : "guest");
+let sub = {plan:"free"}, quota = {d:today(), used:0};
+function loadUserData(){ sub = store.get(K("zan-plan"), {plan:"free"}); quota = store.get(K("zan-quota-day"), {d:today(), used:0}); if (quota.d !== today()) quota = {d:today(), used:0}; }
+const paid = () => sub.plan === "biz" || sub.plan === "pro";
+const canUse = () => paid() || quota.used < LIMIT;
+function renderQuota(){
+  $("#planName").textContent = planLabel(sub.plan).replace(/[«»]/g,"");
+  if (paid()){ $("#quotaTxt").textContent = "· " + t("unlimited"); $("#meter").hidden = true; }
+  else {
+    const left = Math.max(0, LIMIT - quota.used);
+    $("#quotaTxt").textContent = "· " + t("quota", {l:left, n:LIMIT}); $("#meter").hidden = false;
+    $("#quotaBar").style.width = (left/LIMIT*100) + "%";
+  }
+}
+function spend(){ if (paid()) return; if (quota.d !== today()) quota = {d:today(), used:0}; quota.used++; store.set(K("zan-quota-day"), quota); renderQuota(); }
+const limitHTML = () => `<div class="limit">${md(t("limit_t"))}<button class="btn btn-gold" type="button" data-goplans>${esc(t("limit_btn"))}</button></div>`;
+document.addEventListener("click", e => { if (e.target.closest("[data-goplans]")) openTab("plans"); });
+$("#planBtn").onclick = () => openTab("plans");
+
+/* ================= TABS ================= */
+function openTab(id){
+  $$(".tab").forEach(x => x.setAttribute("aria-selected", x.dataset.tab===id));
+  ["ask","check","docs","plans"].forEach(p => $("#pane-"+p).hidden = p!==id);
+  window.scrollTo({top:0});
+}
+$$(".tab").forEach(x => x.onclick = () => openTab(x.dataset.tab));
+
+/* ================= AI ================= */
+let sample = null, live = false;
+const modeNote = $("#modeNote");
+function setDemo(){ live = false; modeNote.hidden = false; modeNote.innerHTML = `<span>⚙︎</span><span><b>${esc(t("demo_b"))}</b> ${esc(t("demo_r"))} ${esc(t("demo_t"))}</span>`; }
+/* AI (Google Gemini) через Netlify Function /api/ask — ключ хранится на сервере, не здесь */
+async function apiSample(input, opts = {}){
+  const messages = typeof input === "string" ? [{role:"user", content:input}] : input.map(m => ({role:m.role, content:m.content}));
+  let res;
+  try{
+    res = await fetch("/api/ask", { method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({ messages, max_tokens: opts.maxTokens || 2000 }), signal: opts.signal });
+  }catch(e){ const er = new Error(e.message); er.code = e.name === "AbortError" ? "cancelled" : "network"; throw er; }
+  if (!res.ok){
+    const er = new Error("api " + res.status); er.code = res.status === 429 ? "rate_limited" : "api_error";
+    let raw = ""; try{ raw = await res.text(); console.warn("Zan AI API:", raw); }catch(_){}
+    let msg = raw; try{ let j = JSON.parse(raw); if (Array.isArray(j)) j = j[0] || {}; msg = (j.error && (j.error.message || j.error)) || j.message || raw; }catch(_){}
+    er.detail = res.status + ": " + String(msg || res.statusText).slice(0, 300);
+    throw er;
+  }
+  const reader = res.body.getReader(), dec = new TextDecoder();
+  let buf = "", text = "";
+  try{
+    for(;;){
+      const { done, value } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream:true });
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0){
+        const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+        for (const line of chunk.split("\n")){
+          if (!line.startsWith("data:")) continue;
+          let ev; try{ ev = JSON.parse(line.slice(5)); }catch(_){ continue; }
+          if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta"){
+            text += ev.delta.text; if (opts.onText) opts.onText({ text, delta: ev.delta.text });
+          } else if (ev.type === "error"){
+            const er = new Error((ev.error && ev.error.message) || "error");
+            er.code = ev.error && ev.error.type === "overloaded_error" ? "rate_limited" : "api_error"; er.detail = er.message; throw er;
+          }
+        }
+      }
+    }
+  }catch(e){
+    if (e.name === "AbortError"){ const er = new Error("cancelled"); er.code = "cancelled"; er.text = text; throw er; }
+    e.text = e.text || text; throw e;
+  }
+  return { text };
+}
+apiSample.json = async (prompt, opts = {}) => {
+  const { text } = await apiSample(prompt + "\n\nВерни только валидный JSON, без пояснений и без ```.", { ...opts, maxTokens: 3000 });
+  const a = text.indexOf("{"), b = text.lastIndexOf("}");
+  try{ return JSON.parse(text.slice(a, b + 1)); }
+  catch(_){ const er = new Error("bad json"); er.code = "invalid_json"; throw er; }
+};
+(async () => {
+  try { sample = window.claude ? await window.claude.use("sample") : null; } catch(e){ sample = null; }
+  if (!sample){ try{ const r = await fetch("/api/ask"); const j = await r.json(); if (j.ok) sample = apiSample; }catch(e){} }
+  if (sample){ live = true; modeNote.hidden = true; } else setDemo();
+})();
+function errText(e){
+  switch(e && e.code){
+    case "not_granted": case "sampling_disabled": case "not_declared": case "capability_disabled": setDemo(); return t("demo_r");
+    case "rate_limited": return t("e_rate");
+    case "invalid_json": return t("e_json");
+    case "cancelled": return "";
+    default: return t("e_net") + (e && e.detail ? " [" + e.detail + "]" : "");
+  }
+}
+
+/* ================= ASK ================= */
+const RULES = () => `Ты — Zan AI, AI-ассистент по законодательству Республики Казахстан для предпринимателей, юристов и граждан.
+Правила:
+- Отвечай на языке вопроса (казахский, русский или английский). Если язык вопроса неясен — отвечай на языке интерфейса: ${T[lang].lang_name}.
+- Пиши простым языком, коротко и по делу: 3–8 предложений или короткий список шагов.
+- Опирайся только на право Республики Казахстан. Называй конкретные акты и, если уверен, статьи. Если не уверен в номере статьи — назови только акт и не выдумывай номер.
+- В конце отдельной строкой перечисли источники (на языке ответа: «Источники:», «Дереккөздер:» или «Sources:»).
+- Если вопрос не о праве РК, вежливо скажи, что помогаешь только с законодательством Казахстана.
+- Если ситуация сложная или есть риск суда, посоветуй обратиться к юристу.
+- Не используй таблицы и заголовки, только абзацы и списки.`;
+
+const EX = {
+ too:{ ru:"Какие документы нужны для регистрации ТОО?", kk:"ЖШС тіркеу үшін қандай құжаттар керек?", en:"What documents do I need to register an LLP?" },
+ prob:{ ru:"Можно ли уволить сотрудника на испытательном сроке?", kk:"Сынақ мерзіміндегі қызметкерді жұмыстан шығаруға бола ма?", en:"Can I dismiss an employee during probation?" },
+ dep:{ ru:"Что делать, если арендодатель не возвращает депозит?", kk:"Жалға беруші депозитті қайтармаса, не істеу керек?", en:"What if my landlord won't return the deposit?" },
+ ip:{ ru:"Как зарегистрироваться как ИП?", kk:"Жеке кәсіпкер ретінде қалай тіркелуге болады?", en:"How do I register as a sole trader?" }
+};
+const DEMO = {
+ too:{ ru:`Для регистрации ТОО в Казахстане обычно нужны:
+1. **Устав** ТОО или заявление о работе на основе типового устава.
+2. **Решение единственного учредителя** или протокол общего собрания учредителей.
+3. **Заявление о государственной регистрации** — его удобно подать онлайн через egov.kz с ЭЦП.
+4. **Удостоверение личности** учредителя и руководителя.
+
+Регистрация через eGov бесплатна и обычно занимает около одного рабочего дня, БИН присваивается автоматически.
+
+Источники: Закон РК «О товариществах с ограниченной и дополнительной ответственностью», Закон РК «О государственной регистрации юридических лиц и учётной регистрации филиалов и представительств».`,
+  kk:`Қазақстанда ЖШС тіркеу үшін әдетте мыналар керек:
+1. ЖШС **жарғысы** немесе үлгілік жарғы негізінде жұмыс істеу туралы өтініш.
+2. **Жалғыз құрылтайшының шешімі** немесе құрылтайшылар жиналысының хаттамасы.
+3. **Мемлекеттік тіркеу туралы өтініш** — оны egov.kz арқылы ЭЦҚ-мен онлайн беру ыңғайлы.
+4. Құрылтайшы мен басшының **жеке куәлігі**.
+
+eGov арқылы тіркеу тегін және әдетте бір жұмыс күніне жуық уақыт алады, БСН автоматты түрде беріледі.
+
+Дереккөздер: ҚР «Жауапкершілігі шектеулі және қосымша жауапкершілігі бар серіктестіктер туралы» Заңы, ҚР «Заңды тұлғаларды мемлекеттік тіркеу және филиалдар мен өкілдіктерді есептік тіркеу туралы» Заңы.`,
+  en:`To register an LLP (TOO) in Kazakhstan you usually need:
+1. The **charter**, or a statement that the LLP operates under the standard charter.
+2. A **decision of the sole founder** or minutes of the founders' meeting.
+3. An **application for state registration** — easiest to file online at egov.kz with a digital signature (EDS).
+4. **ID documents** of the founder and the director.
+
+Registration via eGov is free and usually takes about one business day; the BIN is assigned automatically.
+
+Sources: Law of the RK "On Limited and Additional Liability Partnerships", Law of the RK "On State Registration of Legal Entities and Registration of Branches and Representative Offices".` },
+ prob:{ ru:`Да, можно, но только если результат испытания **неудовлетворительный**, и это нужно обосновать.
+- Испытательный срок указывается в трудовом договоре и обычно не может быть больше **трёх месяцев**.
+- Работодатель должен **письменно уведомить** работника и указать причины.
+- Работник на испытании имеет те же права, что и остальные: зарплата, отпуск, соцгарантии.
+
+Если причин не указать, работник может оспорить увольнение. В спорной ситуации лучше проконсультироваться с юристом.
+
+Источники: Трудовой кодекс РК.`,
+  kk:`Иә, болады, бірақ тек сынақ нәтижесі **қанағаттанарлықсыз** болса және оны негіздеу қажет.
+- Сынақ мерзімі еңбек шартында көрсетіледі және әдетте **үш айдан** аспауы керек.
+- Жұмыс беруші қызметкерге **жазбаша хабарлап**, себептерін көрсетуі тиіс.
+- Сынақтағы қызметкердің құқықтары басқалармен бірдей: жалақы, демалыс, әлеуметтік кепілдіктер.
+
+Себептер көрсетілмесе, қызметкер жұмыстан шығаруға шағымдана алады. Даулы жағдайда заңгермен кеңескен дұрыс.
+
+Дереккөздер: ҚР Еңбек кодексі.`,
+  en:`Yes, but only if the probation result is **unsatisfactory**, and you must justify it.
+- The probation period is set in the employment contract and usually cannot exceed **three months**.
+- The employer must **notify the employee in writing** and state the reasons.
+- An employee on probation has the same rights as others: salary, leave, social guarantees.
+
+Without stated reasons the employee can challenge the dismissal. In a dispute, it's best to consult a lawyer.
+
+Sources: Labour Code of the RK.` },
+ dep:{ ru:`Действуйте по шагам:
+1. **Проверьте договор**: в каком случае депозит возвращается и в какой срок.
+2. **Соберите доказательства**: акт приёма-передачи помещения, квитанции, переписку.
+3. **Направьте письменную претензию** с требованием вернуть деньги в разумный срок, например 10 дней.
+4. Если ответа нет — **иск в суд**.
+
+Если депозит удержан без оснований, вы вправе требовать его возврата и проценты за пользование чужими деньгами.
+
+Источники: Гражданский кодекс РК, Гражданский процессуальный кодекс РК.`,
+  kk:`Қадамдап әрекет етіңіз:
+1. **Шартты тексеріңіз**: депозит қай жағдайда және қай мерзімде қайтарылады.
+2. **Дәлелдер жинаңыз**: үй-жайды қабылдау-тапсыру актісі, түбіртектер, хат алмасу.
+3. Ақшаны ақылға қонымды мерзімде, мысалы 10 күн ішінде қайтаруды талап етіп, **жазбаша талап** жіберіңіз.
+4. Жауап болмаса — **сотқа талап арыз** беріңіз.
+
+Депозит негізсіз ұсталса, оны қайтаруды және бөтен ақшаны пайдаланғаны үшін пайыз талап етуге құқығыңыз бар.
+
+Дереккөздер: ҚР Азаматтық кодексі, ҚР Азаматтық процестік кодексі.`,
+  en:`Go step by step:
+1. **Check the contract**: when the deposit is returned and by what date.
+2. **Collect evidence**: the handover certificate, receipts, messages.
+3. **Send a written claim** demanding the money back within a reasonable time, e.g. 10 days.
+4. If there's no reply — **file a lawsuit**.
+
+If the deposit is withheld without grounds, you can demand it back plus interest for the use of your money.
+
+Sources: Civil Code of the RK, Civil Procedure Code of the RK.` },
+ ip:{ ru:`Зарегистрироваться как ИП просто:
+1. Войдите на **eGov.kz** или в приложение **eGov mobile** с ЭЦП.
+2. Выберите услугу «Уведомление о начале деятельности в качестве индивидуального предпринимателя».
+3. Укажите вид деятельности (код ОКЭД) и налоговый режим.
+4. Отправьте уведомление — регистрация бесплатна и обычно проходит в течение рабочего дня.
+
+После регистрации важно вовремя сдавать налоговую отчётность.
+
+Источники: Предпринимательский кодекс РК, Налоговый кодекс РК.`,
+  kk:`Жеке кәсіпкер ретінде тіркелу оңай:
+1. ЭЦҚ арқылы **eGov.kz** порталына немесе **eGov mobile** қосымшасына кіріңіз.
+2. «Жеке кәсіпкер ретінде қызметтің басталғаны туралы хабарлама» қызметін таңдаңыз.
+3. Қызмет түрін (ЭҚЖЖ коды) және салық режимін таңдаңыз.
+4. Хабарламаны жіберіңіз — тіркеу тегін және әдетте бір жұмыс күні ішінде өтеді.
+
+Тіркелгеннен кейін салық есептілігін уақытында тапсыру маңызды.
+
+Дереккөздер: ҚР Кәсіпкерлік кодексі, ҚР Салық кодексі.`,
+  en:`Registering as a sole trader (IP) is simple:
+1. Log in to **eGov.kz** or the **eGov mobile** app with your digital signature.
+2. Choose the service "Notification of starting activity as an individual entrepreneur".
+3. Select your activity type (OKED code) and tax regime.
+4. Submit the notification — registration is free and usually done within a business day.
+
+After registering, file your tax reports on time.
+
+Sources: Entrepreneurial Code of the RK, Tax Code of the RK.` }
+};
+function findDemo(text){ for (const id in EX) for (const l in EX[id]) if (EX[id][l] === text) return DEMO[id][lang] || DEMO[id][l]; return null; }
+function renderChips(){
+  const box = $("#examples"); if (!box) return;
+  box.innerHTML = Object.keys(EX).map(id => `<button class="chip" type="button">${esc(EX[id][lang])}</button>`).join("");
+  box.querySelectorAll(".chip").forEach(c => c.onclick = () => { q.value = c.textContent; ask(); });
+}
+
+let turns = [], askCtl = null;
+const chat = $("#chat"), q = $("#q");
+$("#askForm").onsubmit = e => { e.preventDefault(); ask(); };
+q.addEventListener("keydown", e => { if (e.key==="Enter" && !e.shiftKey){ e.preventDefault(); ask(); } });
+$("#stopBtn").onclick = () => askCtl && askCtl.abort();
+function bubble(role, html){
+  const d = document.createElement("div");
+  d.className = "msg " + role;
+  d.innerHTML = role==="ai" ? `<div class="who">Zan AI</div><div class="body">${html}</div>` : html;
+  chat.appendChild(d); d.scrollIntoView({block:"end", behavior:"smooth"});
+  return d;
+}
+async function ask(){
+  const text = q.value.trim(); if (!text) return;
+  if (!canUse()){ bubble("ai", limitHTML()); return; }
+  q.value = ""; const ex = $("#examples"); if (ex) ex.remove();
+  bubble("user", esc(text));
+  const b = bubble("ai", `<span class="thinking"><i></i><i></i><i></i></span>`); const body = b.querySelector(".body");
+  if (!live){
+    await new Promise(r => setTimeout(r, 700));
+    const ans = findDemo(text);
+    body.innerHTML = md(ans || t("demo_ans")); if (ans) spend(); b.scrollIntoView({block:"end"}); return;
+  }
+  turns.push({role:"user", content:text});
+  askCtl = new AbortController();
+  $("#askBtn").disabled = true; $("#stopBtn").hidden = false;
+  try{
+    const { text: ans } = await sample([{role:"user", content:RULES()}, ...turns.slice(-8)], {
+      cache:false, signal:askCtl.signal, modelTier:"default", onText: ({text}) => { body.innerHTML = md(text); } });
+    turns.push({role:"assistant", content:ans}); spend();
+  }catch(e){
+    const msg = errText(e);
+    body.innerHTML = (e.text ? md(e.text) : "") + (msg ? `<p class="err">${esc(msg)}</p>` : "");
+    turns.pop();
+  }finally{ $("#askBtn").disabled = false; $("#stopBtn").hidden = true; askCtl = null; }
+}
+
+/* ================= CHECK ================= */
+const SAMPLE_CONTRACT = `ДОГОВОР АРЕНДЫ НЕЖИЛОГО ПОМЕЩЕНИЯ № 14
+г. Алматы
+
+ТОО «Алмалы Недвижимость» (Арендодатель) и ИП «Кофейня Арман» (Арендатор) заключили настоящий договор.
+
+1. Арендодатель передаёт Арендатору помещение площадью 60 м² по адресу ул. Абая, 52 для размещения кофейни.
+2. Арендная плата составляет 450 000 тенге в месяц. Арендодатель вправе в одностороннем порядке изменять размер арендной платы.
+3. Арендатор вносит депозит в размере трёх месяцев аренды. Депозит не возвращается при досрочном расторжении договора по любой причине.
+4. Все виды ремонта, включая капитальный, производятся за счёт Арендатора.
+5. Арендодатель вправе расторгнуть договор в любое время без объяснения причин.
+6. За просрочку оплаты Арендатор уплачивает пеню 1% от суммы долга за каждый день просрочки.
+7. Срок договора — 3 года. Договор не подлежит государственной регистрации.`;
+const DEMO_CHECK = {
+ ru:{risk:"high", summary:"Договор сильно смещён в пользу арендодателя: он может менять цену и расторгать договор без причин, а арендатор рискует потерять депозит и оплатить капремонт.",
+  items:[
+   {clause:"п. 2 — одностороннее изменение арендной платы", level:"high", issue:"Арендодатель может поднять цену когда угодно и на любую сумму.", law:"ГК РК — изменение договора по соглашению сторон", fix:"Цена меняется не чаще раза в год, не более чем на X%, с уведомлением за 30 дней."},
+   {clause:"п. 3 — невозвратный депозит", level:"high", issue:"Депозит за 3 месяца (1,35 млн ₸) теряется при любом досрочном расторжении, даже по вине арендодателя.", law:"ГК РК — обеспечение исполнения обязательств", fix:"Депозит возвращается в течение 10 дней после сдачи помещения, кроме долга и подтверждённого ущерба."},
+   {clause:"п. 4 — капитальный ремонт за счёт арендатора", level:"medium", issue:"По общему правилу капремонт — обязанность арендодателя, если договором не установлено иное.", law:"ГК РК — ремонт имущества, сданного в аренду", fix:"Текущий ремонт — арендатор, капитальный — арендодатель."},
+   {clause:"п. 5 — расторжение без причин", level:"high", issue:"Вы вложитесь в кофейню, а помещение могут забрать в любой день.", law:"ГК РК — основания расторжения договора аренды", fix:"Расторжение только по основаниям из закона или с уведомлением за 3 месяца и компенсацией улучшений."},
+   {clause:"п. 7 — отказ от госрегистрации", level:"medium", issue:"Без регистрации долгосрочный договор слабее защищает арендатора перед третьими лицами.", law:"Закон РК «О государственной регистрации прав на недвижимое имущество»", fix:"Зарегистрировать договор аренды и указать, кто несёт расходы."},
+   {clause:"п. 6 — пеня 1% в день", level:"low", issue:"Это 365% годовых — суд может снизить неустойку как несоразмерную.", law:"ГК РК — уменьшение неустойки", fix:"Снизить до 0,1% в день и ограничить 10% от долга."}]},
+ kk:{risk:"high", summary:"Шарт жалға берушінің пайдасына қатты ығысқан: ол бағаны өзгертіп, шартты себепсіз бұза алады, ал жалға алушы депозитінен айырылып, күрделі жөндеуді төлеуі мүмкін.",
+  items:[
+   {clause:"2-т. — жалдау ақысын біржақты өзгерту", level:"high", issue:"Жалға беруші бағаны кез келген уақытта және кез келген сомаға көтере алады.", law:"ҚР АК — шартты тараптардың келісімі бойынша өзгерту", fix:"Баға жылына бір реттен жиі емес, X%-дан аспай, 30 күн бұрын ескертумен өзгереді."},
+   {clause:"3-т. — қайтарылмайтын депозит", level:"high", issue:"3 айлық депозит (1,35 млн ₸) кез келген мерзімінен бұрын бұзу кезінде, тіпті жалға берушінің кінәсінен де жоғалады.", law:"ҚР АК — міндеттемелердің орындалуын қамтамасыз ету", fix:"Депозит үй-жай тапсырылғаннан кейін 10 күн ішінде қайтарылады, қарыз бен расталған залалды қоспағанда."},
+   {clause:"4-т. — күрделі жөндеу жалға алушының есебінен", level:"medium", issue:"Жалпы ереже бойынша, шартта өзгеше көзделмесе, күрделі жөндеу — жалға берушінің міндеті.", law:"ҚР АК — жалға берілген мүлікті жөндеу", fix:"Ағымдағы жөндеу — жалға алушы, күрделі жөндеу — жалға беруші."},
+   {clause:"5-т. — себепсіз бұзу", level:"high", issue:"Сіз кофеханаға қаржы саласыз, ал үй-жайды кез келген күні алып қоюы мүмкін.", law:"ҚР АК — жалдау шартын бұзу негіздері", fix:"Бұзу тек заңдағы негіздер бойынша немесе 3 ай бұрын ескертіп, жақсартуларды өтеумен."},
+   {clause:"7-т. — мемлекеттік тіркеуден бас тарту", level:"medium", issue:"Тіркеусіз ұзақ мерзімді шарт жалға алушыны үшінші тұлғалар алдында әлсіз қорғайды.", law:"ҚР «Жылжымайтын мүлікке құқықтарды мемлекеттік тіркеу туралы» Заңы", fix:"Жалдау шартын тіркеп, шығындарды кім көтеретінін көрсету."},
+   {clause:"6-т. — күніне 1% өсімпұл", level:"low", issue:"Бұл жылына 365% — сот тұрақсыздық айыбын сәйкессіз деп азайтуы мүмкін.", law:"ҚР АК — тұрақсыздық айыбын азайту", fix:"Күніне 0,1%-ға дейін төмендетіп, қарыздың 10%-ымен шектеу."}]},
+ en:{risk:"high", summary:"The contract is heavily skewed toward the landlord: they can change the rent and terminate without reason, while the tenant risks losing the deposit and paying for major repairs.",
+  items:[
+   {clause:"Cl. 2 — unilateral rent changes", level:"high", issue:"The landlord can raise the rent at any time by any amount.", law:"Civil Code of the RK — amending a contract by agreement of the parties", fix:"Rent changes at most once a year, by no more than X%, with 30 days' notice."},
+   {clause:"Cl. 3 — non-refundable deposit", level:"high", issue:"The 3-month deposit (₸1.35m) is lost on any early termination, even if the landlord is at fault.", law:"Civil Code of the RK — securing performance of obligations", fix:"The deposit is returned within 10 days of handover, minus any debt and proven damage."},
+   {clause:"Cl. 4 — major repairs paid by tenant", level:"medium", issue:"As a general rule, major repairs are the landlord's duty unless the contract says otherwise.", law:"Civil Code of the RK — repair of leased property", fix:"Routine repairs — tenant; major repairs — landlord."},
+   {clause:"Cl. 5 — termination without reason", level:"high", issue:"You invest in the coffee shop, and the premises can be taken back any day.", law:"Civil Code of the RK — grounds for terminating a lease", fix:"Termination only on statutory grounds, or with 3 months' notice and compensation for improvements."},
+   {clause:"Cl. 7 — no state registration", level:"medium", issue:"An unregistered long-term lease protects the tenant less against third parties.", law:"Law of the RK \"On State Registration of Rights to Real Estate\"", fix:"Register the lease and state who pays for registration."},
+   {clause:"Cl. 6 — 1% daily penalty", level:"low", issue:"That's 365% a year — a court may reduce it as disproportionate.", law:"Civil Code of the RK — reducing a penalty", fix:"Lower to 0.1% per day, capped at 10% of the debt."}]}
+};
+let lastCheck = null; // {demo:true} or data
+$("#sampleContract").onclick = () => { $("#contract").value = SAMPLE_CONTRACT; };
+$("#file").onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => $("#contract").value = r.result; r.readAsText(f); };
+function checkEmpty(){ $("#checkOut").innerHTML = `<div class="result-empty"><b>${esc(t("c_empty_t"))}</b><span>${esc(t("c_empty"))}</span></div>`; }
+function renderCheck(d){
+  const L = t("lvl");
+  const lv = ["high","medium","low"].includes(d.risk) ? d.risk : "medium";
+  const items = Array.isArray(d.items) ? d.items : [];
+  $("#checkOut").innerHTML = `<div class="score lvl-${lv}"><b>${esc(t("risk"))}: ${L[lv]}</b><span>${items.length} ${esc(t("items"))}</span></div>
+   <p style="margin:0">${esc(d.summary||"")}</p>` + items.map(it => {
+    const l = ["high","medium","low"].includes(it.level) ? it.level : "medium";
+    return `<div class="risk"><div class="head"><b>${esc(it.clause||"")}</b><span class="pill lvl-${l}">${L[l]}</span></div>
+      <p>${esc(it.issue||"")}</p>${it.law?`<div class="law">${esc(it.law)}</div>`:""}${it.fix?`<div class="fix"><b>${esc(t("fix"))}</b> ${esc(it.fix)}</div>`:""}</div>`;
+  }).join("");
+}
+$("#checkBtn").onclick = async () => {
+  const text = $("#contract").value.trim(); $("#checkErr").textContent = "";
+  if (text.length < 80){ $("#checkErr").textContent = t("c_short"); return; }
+  const out = $("#checkOut");
+  if (!canUse()){ out.innerHTML = limitHTML(); return; }
+  out.innerHTML = `<div class="result-empty"><span class="thinking"><i></i><i></i><i></i></span><span>${esc(t("c_reading"))}</span></div>`;
+  if (!live){
+    await new Promise(r => setTimeout(r, 900));
+    if (text === SAMPLE_CONTRACT){ lastCheck = "demo"; renderCheck(DEMO_CHECK[lang]); spend(); }
+    else out.innerHTML = `<div class="result-empty"><b>${esc(t("demo_b"))}</b><span>${esc(t("c_demo"))}</span></div>`;
+    return;
+  }
+  $("#checkBtn").disabled = true;
+  try{
+    const d = await sample.json(`Ты — Zan AI, юрист-аналитик по праву Республики Казахстан. Проверь договор ниже на риски для стороны, которая загрузила договор (обычно арендатор, заказчик, работник или покупатель — определи по тексту).
+Найди 3–8 самых важных рискованных или незаконных условий. Ссылайся на право РК; номер статьи пиши, только если уверен.
+Все текстовые поля пиши на языке: ${T[lang].lang_name}.
+Ответь только JSON такого вида:
+{"risk":"high|medium|low","summary":"1–2 предложения общего вывода","items":[{"clause":"номер пункта и суть","level":"high|medium|low","issue":"чем опасно, простым языком","law":"норма права РК","fix":"как переформулировать"}]}
+
+ДОГОВОР:
+${text.slice(0, 20000)}`, { modelTier:"default" });
+    lastCheck = d; renderCheck(d); spend();
+  }catch(e){
+    out.innerHTML = `<div class="result-empty"><span class="err">${esc(errText(e) || t("e_stop"))}</span></div>`;
+  }finally{ $("#checkBtn").disabled = false; }
+};
+
+/* ================= DOCS ================= */
+let docCtl = null, lastDoc = "";
+const DT = ["lease","services","claim","labor","refund"];
+function renderDocTypes(){ const s = $("#dtype"), v = s.value; s.innerHTML = DT.map(k => `<option value="${k}">${esc(t("dtypes")[k])}</option>`).join(""); if (v) s.value = v; }
+function docEmpty(){ const o = $("#docOut"); o.className = "result-empty"; o.innerHTML = `<b>${esc(t("d_empty_t"))}</b><span>${esc(t("d_empty"))}</span>`; }
+function demoDoc(title, p1, p2, city, sum, det){
+  const d = new Date().toLocaleDateString(lang==="en" ? "en-GB" : lang==="kk" ? "kk-KZ" : "ru-RU");
+  const X = {
+   ru:[`г. ${city}`,`${p1}, далее «Сторона 1», и ${p2}, далее «Сторона 2», заключили настоящий документ о нижеследующем.`,"1. ПРЕДМЕТ","2. ЦЕНА И ПОРЯДОК РАСЧЁТОВ",`2.1. Стоимость составляет ${sum} тенге.`,"2.2. Оплата производится безналичным переводом не позднее 10 числа текущего месяца.","3. ПРАВА И ОБЯЗАННОСТИ СТОРОН","3.1. Стороны исполняют обязательства надлежащим образом в соответствии с Гражданским кодексом Республики Казахстан.","4. ОТВЕТСТВЕННОСТЬ","4.1. За просрочку платежа начисляется пеня 0,1% от суммы долга за каждый день, но не более 10% от суммы долга.","5. РАЗРЕШЕНИЕ СПОРОВ","5.1. Споры решаются путём переговоров, а при недостижении согласия — в суде.","6. ПОДПИСИ СТОРОН","Сторона","[Демо-шаблон. С подключённым AI Zan AI составит полный документ под ваш тип и детали.]"],
+   kk:[`${city} қ.`,`${p1}, бұдан әрі «1-тарап», және ${p2}, бұдан әрі «2-тарап», төмендегілер туралы осы құжатты жасасты.`,"1. МӘНІ","2. БАҒАСЫ ЖӘНЕ ЕСЕП АЙЫРЫСУ ТӘРТІБІ",`2.1. Құны ${sum} теңгені құрайды.`,"2.2. Төлем ағымдағы айдың 10-күнінен кешіктірілмей қолма-қол ақшасыз аударыммен жүргізіледі.","3. ТАРАПТАРДЫҢ ҚҰҚЫҚТАРЫ МЕН МІНДЕТТЕРІ","3.1. Тараптар міндеттемелерді Қазақстан Республикасының Азаматтық кодексіне сәйкес тиісінше орындайды.","4. ЖАУАПКЕРШІЛІК","4.1. Төлемді кешіктіргені үшін әр күнге қарыз сомасының 0,1% мөлшерінде, бірақ қарыз сомасының 10%-ынан аспайтын өсімпұл есептеледі.","5. ДАУЛАРДЫ ШЕШУ","5.1. Даулар келіссөздер арқылы, ал келісімге қол жеткізілмесе — сотта шешіледі.","6. ТАРАПТАРДЫҢ ҚОЛДАРЫ","Тарап","[Демо-үлгі. AI қосылғанда Zan AI сіздің түріңіз бен мәліметтеріңізге сай толық құжат жасайды.]"],
+   en:[`${city}`,`${p1} ("Party 1") and ${p2} ("Party 2") have entered into this document as follows.`,"1. SUBJECT","2. PRICE AND PAYMENT",`2.1. The price is ${sum} tenge.`,"2.2. Payment is made by bank transfer no later than the 10th day of each month.","3. RIGHTS AND OBLIGATIONS","3.1. The parties shall perform their obligations properly in accordance with the Civil Code of the Republic of Kazakhstan.","4. LIABILITY","4.1. Late payment incurs a penalty of 0.1% of the overdue amount per day, capped at 10% of the debt.","5. DISPUTES","5.1. Disputes are resolved by negotiation and, failing agreement, in court.","6. SIGNATURES","Party","[Demo template. With AI connected, Zan AI drafts a full document for your type and details.]"]
+  }[lang];
+  return `${title.toUpperCase()}
+
+${X[0]}                                        ${d}
+
+${X[1]}
+
+${X[2]}
+1.1. ${det}
+
+${X[3]}
+${X[4]}
+${X[5]}
+
+${X[6]}
+${X[7]}
+
+${X[8]}
+${X[9]}
+
+${X[10]}
+${X[11]}
+
+${X[12]}
+${X[13]} 1: ____________ / ${p1}
+${X[13]} 2: ____________ / ${p2}
+
+${X[14]}`;
+}
+$("#docForm").onsubmit = async e => {
+  e.preventDefault(); $("#docErr").textContent = "";
+  const title = t("dtypes")[$("#dtype").value], p1 = $("#p1").value.trim(), p2 = $("#p2").value.trim(), city = $("#city").value.trim(), sum = $("#sum").value.trim(), det = $("#details").value.trim();
+  if (!p1 || !p2){ $("#docErr").textContent = t("d_parties"); return; }
+  const out = $("#docOut");
+  if (!canUse()){ out.className = ""; out.innerHTML = limitHTML(); return; }
+  out.className = "doc";
+  if (!live){ lastDoc = demoDoc(title,p1,p2,city,sum,det); out.textContent = lastDoc; $("#copyBtn").hidden = false; spend(); return; }
+  out.innerHTML = `<span class="thinking"><i></i><i></i><i></i></span>`;
+  docCtl = new AbortController(); $("#docBtn").disabled = true;
+  try{
+    const { text } = await sample(`Ты — Zan AI. Составь черновик документа по праву Республики Казахстан.
+Язык документа: ${T[lang].lang_name}.
+Тип: ${title}
+Сторона 1: ${p1}
+Сторона 2: ${p2}
+Город: ${city}
+Сумма, тенге: ${sum}
+Детали: ${det}
+Требования: официальный деловой стиль, нумерованные разделы и пункты, реквизиты и места для подписей в конце, справедливые условия для обеих сторон, ссылки на ГК РК или ТК РК там, где это уместно. Пиши обычным текстом без Markdown (без звёздочек и решёток). Не добавляй пояснений до или после документа.`,
+      { modelTier:"default", cache:false, signal:docCtl.signal, onText: ({text}) => { out.textContent = text; } });
+    lastDoc = text; $("#copyBtn").hidden = false; spend();
+  }catch(e){
+    out.textContent = e.text || ""; $("#docErr").textContent = errText(e);
+  }finally{ $("#docBtn").disabled = false; docCtl = null; }
+};
+$("#copyBtn").onclick = async () => {
+  try{ await navigator.clipboard.writeText(lastDoc); $("#copyBtn").textContent = t("copied"); }
+  catch(e){ const r = document.createRange(); r.selectNodeContents($("#docOut")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("#copyBtn").textContent = t("selected"); }
+  setTimeout(() => $("#copyBtn").textContent = t("copy"), 2000);
+};
+
+/* ================= PRICING ================= */
+let period = "month";
+const FORM = "https://forms.gle/xjVCtBXBMEyube837";
+$$(".period button").forEach(b => b.onclick = () => { period = b.dataset.period; $$(".period button").forEach(x => x.setAttribute("aria-pressed", x===b)); renderPlans(); });
+function priceHTML(id){
+  if (id==="free") return `<div class="price">${t("free_price")}</div>`;
+  if (id==="b2b") return `<div class="price">${esc(t("by_deal"))}</div>`;
+  return `<div class="price">${fmt(PRICES[id][period])}<small>${period==="month"?t("per_m"):t("per_y")}</small></div>`;
+}
+function renderPlans(){
+  const P = t("plans");
+  $("#plans").innerHTML = ["free","biz","pro","b2b"].map(id => {
+    const cur = sub.plan === id;
+    let action;
+    if (cur) action = `<div class="curlbl">✓ ${esc(t("p_cur"))}</div>`;
+    else if (id==="free") action = `<div class="curlbl" style="color:var(--muted)">—</div>`;
+    else if (id==="b2b") action = `<a class="btn btn-ghost" href="${FORM}" target="_blank" rel="noopener">${esc(t("p_contact"))}</a>`;
+    else action = `<button class="btn ${id==="biz"?"btn-gold":"btn-primary"}" type="button" data-buy="${id}">${esc(t("p_choose",{p:planLabel(id)}))}</button>`;
+    return `<div class="pcard${id==="biz"?" hot":""}${cur?" cur":""}">${id==="biz"?`<span class="tag">${esc(t("popular"))}</span>`:""}
+      <h3>${esc(id==="b2b" ? "B2B / API" : planLabel(id))}</h3><div class="who">${esc(P[id].who)}</div>
+      ${priceHTML(id)}<ul>${P[id].f.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>${action}</div>`;
+  }).join("");
+  $$("[data-buy]").forEach(b => b.onclick = () => openCheckout(b.dataset.buy));
+  $("#faq").innerHTML = t("faq").map(([a,b]) => `<div><b>${esc(a)}</b>${esc(b)}</div>`).join("");
+  $("#resetPlan").hidden = !paid();
+}
+$("#resetPlan").onclick = () => { sub = {plan:"free"}; store.set(K("zan-plan"), sub); renderQuota(); renderPlans(); };
+
+/* checkout */
+const dlg = $("#checkout"), dlgBody = $("#dlgBody");
+const MI = { kaspi:["K","#e4252c"], card:["▭","#13265c"], halyk:["H","#0f7a4f"], wallet:["⌘","#111"] };
+let co = null;
+$("#dlgX").onclick = () => closeDlg();
+dlg.addEventListener("cancel", e => { if (co && co.step==="proc") e.preventDefault(); });
+function closeDlg(){ if (co && co.step==="proc") return; dlg.close(); if (co && co.step==="ok"){ co = null; openTab("ask"); } co = null; }
+function openCheckout(plan){ co = {plan, period, method:"kaspi", step:"form"}; renderCo(); if (!dlg.open) dlg.showModal(); }
+function nextDate(){ const d = new Date(); if (co.period==="year") d.setFullYear(d.getFullYear()+1); else d.setMonth(d.getMonth()+1); return d.toLocaleDateString(lang==="en"?"en-GB":lang==="kk"?"kk-KZ":"ru-RU"); }
+function renderCo(){
+  $("#dlgX").hidden = co.step==="proc";
+  const amount = PRICES[co.plan][co.period], name = planLabel(co.plan), M = t("m");
+  if (co.step==="form"){
+    const full = PRICES[co.plan].month * 12;
+    dlgBody.className = "dlg";
+    dlgBody.innerHTML = `<h3>${esc(t("co_title"))}</h3>
+      <div class="sum"><div><span>${esc(t("co_plan"))}</span><b>${esc(name)}</b></div>
+        <div><span>${esc(t("co_period"))}</span><span>${esc(co.period==="month"?t("co_month"):t("co_year"))}</span></div>
+        ${co.period==="year"?`<div><span>${esc(t("co_disc"))}</span><span>−${fmt(full-amount)}</span></div>`:""}
+        <div class="tot"><span>${esc(t("co_total"))}</span><span>${fmt(amount)}</span></div></div>
+      <div class="period" role="group" style="align-self:flex-start">
+        <button type="button" data-cp="month" aria-pressed="${co.period==="month"}">${esc(t("p_month"))}</button>
+        <button type="button" data-cp="year" aria-pressed="${co.period==="year"}">${esc(t("p_year"))}</button></div>
+      <b style="font-size:14px">${esc(t("co_method"))}</b>
+      <div class="methods">${Object.keys(M).map(k => `<label class="method"><input type="radio" name="pm" value="${k}" ${co.method===k?"checked":""}>
+        <span class="mico" style="background:${MI[k][1]}">${MI[k][0]}</span><span>${esc(M[k][0])}<small>${esc(M[k][1])}</small></span></label>`).join("")}</div>
+      <div class="demo-pay">${esc(t("co_demo"))}</div>
+      <div class="row"><button class="btn btn-gold" type="button" id="payBtn" style="flex:1">${esc(t("co_pay",{s:fmt(amount)}))}</button>
+        <button class="btn btn-ghost" type="button" id="coCancel">${esc(t("co_cancel"))}</button></div>`;
+    dlgBody.querySelectorAll("[data-cp]").forEach(b => b.onclick = () => { co.period = b.dataset.cp; renderCo(); });
+    dlgBody.querySelectorAll("input[name=pm]").forEach(r => r.onchange = () => { co.method = r.value; });
+    $("#coCancel").onclick = () => closeDlg();
+    $("#payBtn").onclick = () => {
+      co.step = "proc"; renderCo();
+      setTimeout(() => {
+        sub = {plan:co.plan, period:co.period, method:co.method, since:Date.now(), next:nextDate(), amount};
+        store.set(K("zan-plan"), sub); co.step = "ok"; renderCo(); renderQuota(); renderPlans();
+      }, 2200);
+    };
+  } else if (co.step==="proc"){
+    dlgBody.className = "dlg center";
+    dlgBody.innerHTML = `<div class="spin" style="margin:18px auto 4px"></div><h3>${esc(t("co_proc"))}</h3><p class="note" style="margin:0 0 14px">${esc(t("co_proc_s",{m:M[co.method][0]}))}</p>`;
+  } else {
+    dlgBody.className = "dlg center";
+    dlgBody.innerHTML = `<div class="okc" style="margin:8px auto 0">✓</div><h3>${esc(t("co_ok"))}</h3>
+      <p style="margin:0">${esc(t("co_ok_s",{p:name}))}</p>
+      <div class="sum" style="width:100%;text-align:left">
+        <div><span>${esc(t("co_plan"))}</span><b>${esc(name)}</b></div>
+        <div><span>${esc(t("co_paid"))}</span><span>${fmt(amount)}</span></div>
+        <div><span>${esc(t("co_via"))}</span><span>${esc(M[co.method][0])}</span></div>
+        <div><span>${esc(t("co_next"))}</span><span>${esc(nextDate())}</span></div></div>
+      <button class="btn btn-gold" type="button" id="startBtn" style="width:100%">${esc(t("co_start"))}</button>`;
+    $("#startBtn").onclick = () => { const p = name; closeDlg(); toast(t("toast",{p})); };
+  }
+}
+function toast(msg){ const d = document.createElement("div"); d.className = "toast"; d.textContent = msg; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); }
+
+/* ================= LANGUAGE ================= */
+function applyLang(){
+  document.documentElement.lang = lang;
+  $$("[data-lang]").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang===lang));
+  $$("[data-i]").forEach(el => { if (el.dataset.i === "a_h") el.innerHTML = t("a_h"); else el.textContent = t(el.dataset.i); });
+  $$("[data-ph]").forEach(el => { el.placeholder = t(el.dataset.ph); el.setAttribute("aria-label", t(el.dataset.ph)); });
+  renderChips(); renderDocTypes(); renderQuota(); renderPlans();
+  if (!lastCheck) checkEmpty(); else if (lastCheck === "demo") renderCheck(DEMO_CHECK[lang]);
+  if (!lastDoc) docEmpty();
+  if (!modeNote.hidden) setDemo();
+  if (co && dlg.open) renderCo();
+}
+$$("[data-lang]").forEach(b => b.onclick = () => { lang = b.dataset.lang; store.set("zan-lang", lang); applyLang(); });
+
+/* ================= AUTH (демо: аккаунты хранятся в браузере) ================= */
+const authEl = $("#auth");
+async function hashPw(email, pw){
+  const str = "zan:" + email + ":" + pw;
+  try{ const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)); return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join(""); }
+  catch(e){ let h = 5381; for (const c of str) h = ((h << 5) + h + c.charCodeAt(0)) | 0; return "d" + (h >>> 0).toString(16); }
+}
+function setAuthMode(m){
+  $$("[data-am]").forEach(b => { if (b.closest(".seg")) b.setAttribute("aria-selected", b.dataset.am === m); });
+  $("#regForm").hidden = m !== "reg"; $("#loginForm").hidden = m !== "login";
+  $("#regErr").textContent = ""; $("#loginErr").textContent = "";
+  (m === "reg" ? $("#rName") : $("#lEmail")).focus();
+}
+$$("[data-am]").forEach(b => b.onclick = () => setAuthMode(b.dataset.am));
+$$("[data-eye]").forEach(b => b.onclick = () => { const i = b.previousElementSibling; const show = i.type === "password"; i.type = show ? "text" : "password"; b.textContent = t(show ? "hide" : "show"); });
+function enter(u, isNew){
+  user = u; store.set("zan-session", u.email);
+  loadUserData(); authEl.hidden = true;
+  $("#ava").textContent = (u.name.trim()[0] || "?").toUpperCase(); $("#uname").textContent = u.name;
+  renderQuota(); renderPlans(); window.scrollTo({top:0});
+  toast(t(isNew ? "welcome" : "hi", {n:u.name}));
+}
+$("#regForm").onsubmit = async e => {
+  e.preventDefault(); const err = $("#regErr"); err.textContent = "";
+  const name = $("#rName").value.trim(), email = $("#rEmail").value.trim().toLowerCase(), pw = $("#rPass").value, pw2 = $("#rPass2").value;
+  const role = (document.querySelector("input[name=role]:checked") || {}).value || "biz";
+  if (!name) return err.textContent = t("e_name");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return err.textContent = t("e_email");
+  if (pw.length < 6) return err.textContent = t("e_pass");
+  if (pw !== pw2) return err.textContent = t("e_pass2");
+  if (!$("#rAgree").checked) return err.textContent = t("e_agree");
+  const users = store.get("zan-users", {});
+  if (users[email]){ err.textContent = t("e_exists"); $("#lEmail").value = email; return; }
+  users[email] = { name, email, role, hash: await hashPw(email, pw), created: Date.now() };
+  store.set("zan-users", users);
+  $("#regForm").reset();
+  enter(users[email], true);
+};
+$("#loginForm").onsubmit = async e => {
+  e.preventDefault(); const err = $("#loginErr"); err.textContent = "";
+  const email = $("#lEmail").value.trim().toLowerCase(), pw = $("#lPass").value;
+  if (!email || !pw) return err.textContent = t("e_empty");
+  const u = store.get("zan-users", {})[email];
+  if (!u) return err.textContent = t("e_nouser");
+  if (u.hash !== await hashPw(email, pw)) return err.textContent = t("e_wrong");
+  $("#loginForm").reset();
+  enter(u, false);
+};
+$("#logout").onclick = () => { try{ localStorage.removeItem("zan-session"); }catch(e){} location.reload(); };
+
+applyLang();
+(() => {
+  const email = store.get("zan-session", null), u = email && store.get("zan-users", {})[email];
+  if (u){ user = u; loadUserData(); $("#ava").textContent = (u.name.trim()[0] || "?").toUpperCase(); $("#uname").textContent = u.name; renderQuota(); renderPlans(); }
+  else { authEl.hidden = false; setAuthMode(store.get("zan-users", null) ? "login" : "reg"); }
+})();
+})();
+</script>
+</body>
+</html>
